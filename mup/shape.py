@@ -9,6 +9,9 @@ from torch.nn.modules.conv import _ConvNd
 from mup.infshape import InfShape, zip_infshape
 from mup.layer import MuReadout, rescale_linear_bias
 
+# LAST IMPORT!
+import transformer_engine.pytorch as te
+
 __BSH_COMMENT__ = '''\
 # This is a base shape file encoded in yaml
 # - `null` indicates a dimension is "finite", i.e. a non-"width" dimension
@@ -16,9 +19,6 @@ __BSH_COMMENT__ = '''\
 '''
 
 def get_shapes(model):
-    # If you want to implement a custom shapes function, you can use this name
-    if hasattr(model, "get_shapes"):
-        return model.get_shapes()
     return {name: param.shape for name, param in model.named_parameters()}
 
 def get_infshapes(model):
@@ -190,7 +190,7 @@ def set_base_shapes(model, base, rescale_params=True, delta=None, savefile=None,
         for name, module in model.named_modules():
             if isinstance(module, MuReadout):
                 module._rescale_parameters()
-            elif isinstance(module, (Linear, _ConvNd)):
+            elif isinstance(module, (Linear, _ConvNd, te.Linear)):
                 rescale_linear_bias(module)
     return model
 
@@ -201,8 +201,8 @@ def assert_hidden_size_inf(model):
     modules should not exist in a correctly parametrized models.
     '''
     for name, module in model.named_modules():
-        if isinstance(module, Linear) and not isinstance(module, MuReadout):
-            if not module.weight.infshape[0].isinf() and module.weight.infshape[1].isinf():
+        if isinstance(module, (Linear, te.Linear)) and not isinstance(module, MuReadout):
+            if hasattr(module, 'weight') and not module.weight.infshape[0].isinf() and module.weight.infshape[1].isinf():
                 assert False, (
                     f'{name} has infinite fan-in and finite fan-out dimensions but is not type `MuReadout`. '
                     'To resolve this, either change the module to `MuReadout` or change the fan-out to an infinite dimension.'

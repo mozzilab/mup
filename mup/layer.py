@@ -77,8 +77,19 @@ def rescale_linear_bias(linear):
         raise RuntimeError("`rescale_linear_bias` has been called once before already. Unless you know what you are doing, usually you should not be calling `rescale_linear_bias` more than once.\n"
         "If you called `set_base_shapes` on a model loaded from a checkpoint, or just want to re-set the base shapes of an existing model, make sure to set the flag `rescale_params=False`.\n"
         "To bypass this error and *still rescale biases*, set `linear._has_rescaled_params=False` before this call.")
-    if linear.bias is None:
+    if hasattr(linear, 'bias') and linear.bias is None:
         return
-    fanin_mult = linear.weight.infshape[1].width_mult()
-    linear.bias.data *= fanin_mult**0.5
-    linear._has_rescaled_params = True
+    if hasattr(linear, 'key_bias') and linear.key_bias is None:
+        return
+    if hasattr(linear, 'weight'):
+        fanin_mult = linear.weight.infshape[1].width_mult()
+        linear.bias.data *= fanin_mult**0.5
+        linear._has_rescaled_params = True
+    if hasattr(linear, 'key_weight'):
+        fanin_mult = linear.key_weight.infshape[1].width_mult()
+        linear.key_bias.data *= fanin_mult**0.5
+        linear._has_rescaled_params = True
+    if hasattr(linear, 'value_weight'):
+        fanin_mult = linear.value_weight.infshape[1].width_mult()
+        linear.value_bias.data *= fanin_mult**0.5
+        linear._has_rescaled_params = True
